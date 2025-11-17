@@ -32,12 +32,12 @@ RUN useradd -m -u 1000 chispas && \
 
 USER chispas
 
-# Exponer puerto
-EXPOSE 5000
+# Exponer puerto (Railway usa PORT como variable de entorno)
+EXPOSE ${PORT:-5000}
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000')" || exit 1
+# Healthcheck - Deshabilitado para Railway (Railway maneja su propio healthcheck)
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD python -c "import requests; requests.get('http://localhost:${PORT:-5000}')" || exit 1
 
 # Comando de inicio
 CMD ["python", "app.py"]

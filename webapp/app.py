@@ -8,6 +8,7 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import random
 import json
+import os
 from datetime import datetime
 
 app = Flask(__name__)
@@ -209,7 +210,14 @@ def handle_game_event(data):
     emit('robot_state', robot_state, broadcast=True)
 
 if __name__ == '__main__':
+    # Obtener puerto de variable de entorno (Railway, Render, etc.) o usar 5000 por defecto
+    port = int(os.getenv('PORT', 5000))
+
     print("🤖 Iniciando Chispas - Robot para Amanda")
-    print("📱 Accede desde tu celular a: http://<tu-ip>:5000")
-    print("💻 O localmente en: http://localhost:5000")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    print(f"📱 Accede desde tu celular a: http://<tu-ip>:{port}")
+    print(f"💻 O localmente en: http://localhost:{port}")
+
+    # Debug solo si no estamos en producción
+    debug_mode = os.getenv('FLASK_ENV', 'production') != 'production'
+
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug_mode)
