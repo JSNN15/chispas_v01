@@ -8,9 +8,19 @@ class RobotFace {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.expression = 'happy';
+        this.previousExpression = 'happy';
         this.blinkTimer = 0;
         this.isBlinking = false;
         this.animationFrame = 0;
+
+        // Nuevas propiedades para animaciones
+        this.headTilt = 0;
+        this.headBounce = 0;
+        this.earWiggle = 0;
+        this.expressionTransition = 1; // 0 a 1 para transiciones suaves
+        this.eyeLookX = 0;
+        this.eyeLookY = 0;
+        this.breathePhase = 0;
 
         // Configuración de tamaños responsivos
         this.resize();
@@ -31,7 +41,32 @@ class RobotFace {
     }
 
     setExpression(expression) {
-        this.expression = expression;
+        if (this.expression !== expression) {
+            this.previousExpression = this.expression;
+            this.expression = expression;
+            this.expressionTransition = 0; // Iniciar transición
+
+            // Animaciones especiales al cambiar expresión
+            this.headBounce = 20 * this.scale;
+
+            // Movimientos específicos por expresión
+            switch (expression) {
+                case 'curious':
+                    this.headTilt = 15;
+                    break;
+                case 'surprised':
+                    this.headBounce = 30 * this.scale;
+                    break;
+                case 'excited':
+                    this.headBounce = 40 * this.scale;
+                    break;
+                case 'sad':
+                    this.headTilt = -5;
+                    break;
+                default:
+                    this.headTilt = 0;
+            }
+        }
     }
 
     // Dibujar la cara completa
@@ -40,6 +75,15 @@ class RobotFace {
 
         // Fondo con gradiente
         this.drawBackground();
+
+        // Guardar estado del canvas
+        this.ctx.save();
+
+        // Aplicar transformaciones para animaciones
+        this.ctx.translate(this.centerX, this.centerY);
+        this.ctx.rotate((this.headTilt * Math.PI) / 180);
+        this.ctx.translate(0, -this.headBounce + Math.sin(this.breathePhase) * 3 * this.scale);
+        this.ctx.translate(-this.centerX, -this.centerY);
 
         // Componentes de la cara
         this.drawHead();
@@ -50,7 +94,10 @@ class RobotFace {
         this.drawWhiskers();
         this.drawDecorations();
 
-        // Efectos especiales según expresión
+        // Restaurar estado del canvas
+        this.ctx.restore();
+
+        // Efectos especiales según expresión (sin transformaciones)
         this.drawSpecialEffects();
     }
 
@@ -104,39 +151,61 @@ class RobotFace {
     drawEars() {
         const earSize = 60 * this.scale;
 
+        // Animación de orejas (se mueven cuando está curioso o emocionado)
+        let leftEarAngle = 0;
+        let rightEarAngle = 0;
+        if (this.expression === 'curious' || this.expression === 'excited') {
+            leftEarAngle = Math.sin(this.animationFrame * 0.1) * 10;
+            rightEarAngle = Math.sin(this.animationFrame * 0.1 + Math.PI) * 10;
+        } else if (this.expression === 'sad') {
+            leftEarAngle = -15;
+            rightEarAngle = -15;
+        }
+
         this.ctx.fillStyle = '#2C3E50';
 
-        // Oreja izquierda
+        // Oreja izquierda con rotación
+        this.ctx.save();
+        this.ctx.translate(this.centerX - 75 * this.scale, this.centerY - 100 * this.scale);
+        this.ctx.rotate((leftEarAngle * Math.PI) / 180);
         this.ctx.beginPath();
-        this.ctx.moveTo(this.centerX - 100 * this.scale, this.centerY - 100 * this.scale);
-        this.ctx.lineTo(this.centerX - 50 * this.scale, this.centerY - 100 * this.scale);
-        this.ctx.lineTo(this.centerX - 75 * this.scale, this.centerY - 150 * this.scale);
+        this.ctx.moveTo(-25 * this.scale, 0);
+        this.ctx.lineTo(25 * this.scale, 0);
+        this.ctx.lineTo(0, -50 * this.scale);
         this.ctx.closePath();
         this.ctx.fill();
 
-        // Oreja derecha
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.centerX + 100 * this.scale, this.centerY - 100 * this.scale);
-        this.ctx.lineTo(this.centerX + 50 * this.scale, this.centerY - 100 * this.scale);
-        this.ctx.lineTo(this.centerX + 75 * this.scale, this.centerY - 150 * this.scale);
-        this.ctx.closePath();
-        this.ctx.fill();
-
-        // Detalles internos de las orejas
+        // Detalle interno oreja izquierda
         this.ctx.fillStyle = '#FF6B9D';
         this.ctx.beginPath();
-        this.ctx.moveTo(this.centerX - 90 * this.scale, this.centerY - 105 * this.scale);
-        this.ctx.lineTo(this.centerX - 65 * this.scale, this.centerY - 105 * this.scale);
-        this.ctx.lineTo(this.centerX - 75 * this.scale, this.centerY - 130 * this.scale);
+        this.ctx.moveTo(-15 * this.scale, -5 * this.scale);
+        this.ctx.lineTo(10 * this.scale, -5 * this.scale);
+        this.ctx.lineTo(0, -30 * this.scale);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.restore();
+
+        // Oreja derecha con rotación
+        this.ctx.fillStyle = '#2C3E50';
+        this.ctx.save();
+        this.ctx.translate(this.centerX + 75 * this.scale, this.centerY - 100 * this.scale);
+        this.ctx.rotate((rightEarAngle * Math.PI) / 180);
+        this.ctx.beginPath();
+        this.ctx.moveTo(25 * this.scale, 0);
+        this.ctx.lineTo(-25 * this.scale, 0);
+        this.ctx.lineTo(0, -50 * this.scale);
         this.ctx.closePath();
         this.ctx.fill();
 
+        // Detalle interno oreja derecha
+        this.ctx.fillStyle = '#FF6B9D';
         this.ctx.beginPath();
-        this.ctx.moveTo(this.centerX + 90 * this.scale, this.centerY - 105 * this.scale);
-        this.ctx.lineTo(this.centerX + 65 * this.scale, this.centerY - 105 * this.scale);
-        this.ctx.lineTo(this.centerX + 75 * this.scale, this.centerY - 130 * this.scale);
+        this.ctx.moveTo(15 * this.scale, -5 * this.scale);
+        this.ctx.lineTo(-10 * this.scale, -5 * this.scale);
+        this.ctx.lineTo(0, -30 * this.scale);
         this.ctx.closePath();
         this.ctx.fill();
+        this.ctx.restore();
     }
 
     drawEyes() {
@@ -333,30 +402,30 @@ class RobotFace {
     drawNeutralEyes(leftX, rightX, y) {
         const eyeSize = 35 * this.scale;
 
-        // Ojos normales
+        // Ojos normales con movimiento sutil
         this.ctx.fillStyle = '#2C3E50';
         this.ctx.beginPath();
-        this.ctx.arc(leftX, y, eyeSize, 0, Math.PI * 2);
+        this.ctx.arc(leftX + this.eyeLookX, y + this.eyeLookY, eyeSize, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.beginPath();
-        this.ctx.arc(rightX, y, eyeSize, 0, Math.PI * 2);
+        this.ctx.arc(rightX + this.eyeLookX, y + this.eyeLookY, eyeSize, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Brillos
+        // Brillos que siguen la mirada
         this.ctx.fillStyle = '#FFFFFF';
         this.ctx.beginPath();
-        this.ctx.arc(leftX - 10 * this.scale, y - 10 * this.scale, 10 * this.scale, 0, Math.PI * 2);
+        this.ctx.arc(leftX + this.eyeLookX - 10 * this.scale, y + this.eyeLookY - 10 * this.scale, 10 * this.scale, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.beginPath();
-        this.ctx.arc(rightX - 10 * this.scale, y - 10 * this.scale, 10 * this.scale, 0, Math.PI * 2);
+        this.ctx.arc(rightX + this.eyeLookX - 10 * this.scale, y + this.eyeLookY - 10 * this.scale, 10 * this.scale, 0, Math.PI * 2);
         this.ctx.fill();
 
         // Brillos secundarios
         this.ctx.beginPath();
-        this.ctx.arc(leftX + 8 * this.scale, y + 8 * this.scale, 5 * this.scale, 0, Math.PI * 2);
+        this.ctx.arc(leftX + this.eyeLookX + 8 * this.scale, y + this.eyeLookY + 8 * this.scale, 5 * this.scale, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.beginPath();
-        this.ctx.arc(rightX + 8 * this.scale, y + 8 * this.scale, 5 * this.scale, 0, Math.PI * 2);
+        this.ctx.arc(rightX + this.eyeLookX + 8 * this.scale, y + this.eyeLookY + 8 * this.scale, 5 * this.scale, 0, Math.PI * 2);
         this.ctx.fill();
     }
 
@@ -472,19 +541,85 @@ class RobotFace {
     }
 
     drawSpecialEffects() {
-        // Partículas flotantes cuando está emocionado
-        if (this.expression === 'excited') {
-            for (let i = 0; i < 5; i++) {
-                const angle = (this.animationFrame * 0.02 + i * Math.PI * 2 / 5) % (Math.PI * 2);
-                const radius = 150 * this.scale;
-                const x = this.centerX + Math.cos(angle) * radius;
-                const y = this.centerY + Math.sin(angle) * radius;
+        switch (this.expression) {
+            case 'excited':
+                // Partículas de colores girando
+                for (let i = 0; i < 5; i++) {
+                    const angle = (this.animationFrame * 0.02 + i * Math.PI * 2 / 5) % (Math.PI * 2);
+                    const radius = 150 * this.scale;
+                    const x = this.centerX + Math.cos(angle) * radius;
+                    const y = this.centerY + Math.sin(angle) * radius;
 
-                this.ctx.fillStyle = `hsla(${i * 72}, 100%, 70%, 0.6)`;
+                    this.ctx.fillStyle = `hsla(${i * 72}, 100%, 70%, 0.6)`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 8 * this.scale, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                break;
+
+            case 'happy':
+                // Estrellas brillantes intermitentes
+                for (let i = 0; i < 3; i++) {
+                    const opacity = (Math.sin(this.animationFrame * 0.05 + i) + 1) / 2;
+                    this.ctx.fillStyle = `rgba(255, 215, 0, ${opacity * 0.8})`;
+                    const x = this.centerX + (i - 1) * 100 * this.scale;
+                    const y = this.centerY - 140 * this.scale;
+                    this.drawStar(x, y, 5, 12 * this.scale, 6 * this.scale);
+                }
+                break;
+
+            case 'loving':
+                // Corazones flotantes
+                for (let i = 0; i < 4; i++) {
+                    const yOffset = ((this.animationFrame * 2 + i * 30) % 150) * this.scale;
+                    const x = this.centerX + (i % 2 === 0 ? -1 : 1) * (80 + (i % 2) * 40) * this.scale;
+                    const y = this.centerY + 120 * this.scale - yOffset;
+                    const opacity = 1 - (yOffset / (150 * this.scale));
+
+                    this.ctx.fillStyle = `rgba(255, 105, 180, ${opacity * 0.6})`;
+                    this.drawHeart(x, y, 15 * this.scale);
+                }
+                break;
+
+            case 'curious':
+                // Signos de interrogación flotando
+                this.ctx.fillStyle = '#9B59B6';
+                this.ctx.font = `${40 * this.scale}px Fredoka, sans-serif`;
+                const questionY = this.centerY - 120 * this.scale + Math.sin(this.animationFrame * 0.05) * 10 * this.scale;
+                this.ctx.fillText('?', this.centerX + 100 * this.scale, questionY);
+                break;
+
+            case 'surprised':
+                // Rayos de sorpresa
+                this.ctx.strokeStyle = '#FFD700';
+                this.ctx.lineWidth = 4 * this.scale;
+                this.ctx.lineCap = 'round';
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i * Math.PI * 2) / 8 + this.animationFrame * 0.02;
+                    const startR = 140 * this.scale;
+                    const endR = 160 * this.scale + Math.sin(this.animationFrame * 0.1 + i) * 10 * this.scale;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(
+                        this.centerX + Math.cos(angle) * startR,
+                        this.centerY + Math.sin(angle) * startR
+                    );
+                    this.ctx.lineTo(
+                        this.centerX + Math.cos(angle) * endR,
+                        this.centerY + Math.sin(angle) * endR
+                    );
+                    this.ctx.stroke();
+                }
+                break;
+
+            case 'sleepy':
+                // Burbujas de sueño adicionales
+                const bubbleY = this.centerY - Math.sin(this.animationFrame * 0.03) * 30 * this.scale;
+                this.ctx.strokeStyle = 'rgba(155, 89, 182, 0.5)';
+                this.ctx.lineWidth = 2 * this.scale;
                 this.ctx.beginPath();
-                this.ctx.arc(x, y, 8 * this.scale, 0, Math.PI * 2);
-                this.ctx.fill();
-            }
+                this.ctx.arc(this.centerX + 120 * this.scale, bubbleY, 20 * this.scale, 0, Math.PI * 2);
+                this.ctx.stroke();
+                break;
         }
     }
 
@@ -552,6 +687,41 @@ class RobotFace {
             setTimeout(() => {
                 this.isBlinking = false;
             }, 200);
+        }
+
+        // Actualizar fase de respiración (efecto sutil de respirar)
+        this.breathePhase += 0.02;
+
+        // Reducir bounce gradualmente
+        if (this.headBounce > 0) {
+            this.headBounce *= 0.9;
+            if (this.headBounce < 0.1) this.headBounce = 0;
+        }
+
+        // Suavizar tilt hacia el objetivo
+        const targetTilt = this.expression === 'curious' ? 15 :
+                          this.expression === 'sad' ? -5 : 0;
+        this.headTilt += (targetTilt - this.headTilt) * 0.1;
+
+        // Movimiento sutil de ojos (mirar alrededor ocasionalmente)
+        if (this.expression === 'happy' || this.expression === 'neutral' || this.expression === 'curious') {
+            // Movimiento muy sutil de ojos
+            if (Math.random() < 0.005) {
+                this.eyeLookX = (Math.random() - 0.5) * 8 * this.scale;
+                this.eyeLookY = (Math.random() - 0.5) * 8 * this.scale;
+            }
+            // Suavizar movimiento de ojos hacia el objetivo
+            this.eyeLookX *= 0.95;
+            this.eyeLookY *= 0.95;
+        } else {
+            this.eyeLookX *= 0.9;
+            this.eyeLookY *= 0.9;
+        }
+
+        // Transición suave entre expresiones
+        if (this.expressionTransition < 1) {
+            this.expressionTransition += 0.05;
+            if (this.expressionTransition > 1) this.expressionTransition = 1;
         }
 
         this.draw();
