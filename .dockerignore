@@ -1,0 +1,7 @@
+# Docker
+.env.local
+*.log
+
+# Volúmenes de Docker
+whisper-models/
+redis-data/

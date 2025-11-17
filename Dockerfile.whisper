@@ -1,0 +1,44 @@
+# Dockerfile para Chispas - Servicio de Whisper Local
+FROM python:3.11-slim
+
+# Metadatos
+LABEL maintainer="Julian Neira Nova"
+LABEL description="Chispas Robot - Whisper Local Speech Recognition"
+
+# Variables de entorno
+ENV PYTHONUNBUFFERED=1
+ENV WHISPER_MODEL=base
+ENV DEVICE=cpu
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Crear directorio de trabajo
+WORKDIR /app
+
+# Copiar requirements
+COPY requirements-whisper.txt .
+
+# Instalar dependencias Python
+RUN pip install --no-cache-dir -r requirements-whisper.txt
+
+# Copiar código de la aplicación
+COPY webapp/services/whisper_service.py .
+COPY webapp/services/__init__.py ./services/__init__.py
+
+# Descargar modelo al construir la imagen (opcional, comenta si prefieres descargarlo en runtime)
+# RUN python -c "from faster_whisper import WhisperModel; WhisperModel('${WHISPER_MODEL}', device='cpu')"
+
+# Exponer puerto
+EXPOSE 5001
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:5001/health')" || exit 1
+
+# Comando de inicio
+CMD ["python", "whisper_service.py"]
