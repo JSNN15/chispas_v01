@@ -271,8 +271,15 @@ header h1 {
 
 .game-buttons {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
+}
+
+/* En móviles, mostrar en columna única */
+@media (max-width: 600px) {
+    .game-buttons {
+        grid-template-columns: 1fr;
+    }
 }
 
 .btn-game {

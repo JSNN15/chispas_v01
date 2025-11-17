@@ -165,17 +165,39 @@ function speak(text) {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'es-ES';
-    utterance.rate = 0.9; // Velocidad un poco más lenta para niños
-    utterance.pitch = 1.2; // Tono más agudo (voz más infantil)
+    utterance.rate = 0.8; // Más lento y pausado para niños
+    utterance.pitch = 1.5; // Tono más agudo (voz suave infantil)
+    utterance.volume = 0.9; // Volumen suave
 
-    // Intentar usar una voz femenina española si está disponible
+    // Buscar la mejor voz para niños (prioridad: femenina, infantil, española)
     const voices = synthesis.getVoices();
-    const spanishVoice = voices.find(voice =>
-        voice.lang.startsWith('es') && voice.name.includes('Female')
-    ) || voices.find(voice => voice.lang.startsWith('es'));
 
-    if (spanishVoice) {
-        utterance.voice = spanishVoice;
+    // Intentar encontrar voces específicas buenas para niños
+    let selectedVoice = voices.find(voice =>
+        voice.lang.startsWith('es') &&
+        (voice.name.includes('Mónica') || voice.name.includes('Monica') ||
+         voice.name.includes('Paulina') || voice.name.includes('Lucía') ||
+         voice.name.includes('Lucia'))
+    );
+
+    // Si no encuentra esas, buscar cualquier voz femenina
+    if (!selectedVoice) {
+        selectedVoice = voices.find(voice =>
+            voice.lang.startsWith('es') &&
+            (voice.name.toLowerCase().includes('female') ||
+             voice.name.toLowerCase().includes('woman') ||
+             voice.name.toLowerCase().includes('mujer'))
+        );
+    }
+
+    // Si aún no encuentra, usar cualquier voz española
+    if (!selectedVoice) {
+        selectedVoice = voices.find(voice => voice.lang.startsWith('es'));
+    }
+
+    if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        console.log('🗣️ Usando voz:', selectedVoice.name);
     }
 
     utterance.onstart = () => {
@@ -275,98 +297,100 @@ function initEventListeners() {
     });
 }
 
-// ========== JUEGOS ==========
+// ========== JUEGOS EDUCATIVOS ==========
 function startGame(gameType) {
     robotFace.setExpression('excited');
 
     switch (gameType) {
-        case 'colors':
-            startColorGame();
+        case 'reading':
+            startReadingGame();
             break;
-        case 'animals':
-            startAnimalGame();
+        case 'addition':
+            startAdditionGame();
             break;
-        case 'songs':
-            startSongGame();
-            break;
-        case 'numbers':
-            startNumberGame();
+        case 'subtraction':
+            startSubtractionGame();
             break;
         default:
-            updateMessage('¡Juguemos!');
+            updateMessage('¡Vamos a aprender!');
     }
 }
 
-function startColorGame() {
-    const colors = [
-        { name: 'rojo', emoji: '🔴' },
-        { name: 'azul', emoji: '🔵' },
-        { name: 'verde', emoji: '🟢' },
-        { name: 'amarillo', emoji: '🟡' },
-        { name: 'rosa', emoji: '🌸' },
-        { name: 'morado', emoji: '🟣' }
+// Juego de Lectura
+function startReadingGame() {
+    const words = [
+        { word: 'CASA', syllables: 'ca-sa', meaning: '🏠' },
+        { word: 'GATO', syllables: 'ga-to', meaning: '🐱' },
+        { word: 'SOL', syllables: 'sol', meaning: '☀️' },
+        { word: 'LUNA', syllables: 'lu-na', meaning: '🌙' },
+        { word: 'FLOR', syllables: 'flor', meaning: '🌸' },
+        { word: 'AGUA', syllables: 'a-gua', meaning: '💧' },
+        { word: 'NIÑA', syllables: 'ni-ña', meaning: '👧' },
+        { word: 'PERRO', syllables: 'pe-rro', meaning: '🐕' },
+        { word: 'LIBRO', syllables: 'li-bro', meaning: '📖' },
+        { word: 'PELOTA', syllables: 'pe-lo-ta', meaning: '⚽' }
     ];
 
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    updateMessage(`🎨 ¿De qué color es esto? ${randomColor.emoji}`);
-    speak(`¿De qué color es esto? ${randomColor.emoji}`);
+    const randomWord = words[Math.floor(Math.random() * words.length)];
 
-    // Dar tiempo para responder
-    setTimeout(() => {
-        updateMessage(`¡Es ${randomColor.name}! ${randomColor.emoji}`);
-        speak(`¡Es ${randomColor.name}!`);
-    }, 5000);
-}
+    updateMessage(`📖 Lee esta palabra:\n\n✨ ${randomWord.word} ✨\n\n(${randomWord.syllables})`);
+    speak(`Lee esta palabra. ${randomWord.word}. ${randomWord.syllables}`);
 
-function startAnimalGame() {
-    const animals = [
-        { name: 'perro', sound: '¡Guau guau!', emoji: '🐕' },
-        { name: 'gato', sound: '¡Miau miau!', emoji: '🐱' },
-        { name: 'vaca', sound: '¡Muuu!', emoji: '🐄' },
-        { name: 'oveja', sound: '¡Beee!', emoji: '🐑' },
-        { name: 'pato', sound: '¡Cuac cuac!', emoji: '🦆' },
-        { name: 'león', sound: '¡Grrr!', emoji: '🦁' }
-    ];
-
-    const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
-    updateMessage(`${randomAnimal.emoji} ¿Qué animal hace ${randomAnimal.sound}?`);
-    speak(`¿Qué animal hace ${randomAnimal.sound}?`);
+    robotFace.setExpression('curious');
 
     setTimeout(() => {
-        updateMessage(`¡Es un ${randomAnimal.name}! ${randomAnimal.emoji}`);
-        speak(`¡Es un ${randomAnimal.name}!`);
+        updateMessage(`¡Muy bien! ${randomWord.word} es ${randomWord.meaning}`);
+        speak(`¡Muy bien! ${randomWord.word}`);
         robotFace.setExpression('happy');
-    }, 5000);
+    }, 8000);
 }
 
-function startSongGame() {
-    const songs = [
-        '🎵 Brilla, brilla mi estrellita, quiero verte titilar 🎵',
-        '🎵 La vaca lechera, tiene un becerrito, que le da las leches y le da quesito 🎵',
-        '🎵 Pin pon es un muñeco, muy guapo y de cartón 🎵',
-        '🎵 Cinco lobitos tiene la loba, cinco lobitos detrás de la escoba 🎵',
-        '🎵 Tengo una muñeca vestida de azul 🎵'
-    ];
-
-    const randomSong = songs[Math.floor(Math.random() * songs.length)];
-    updateMessage(randomSong);
-    speak(randomSong);
-    robotFace.setExpression('singing');
-}
-
-function startNumberGame() {
-    const num1 = Math.floor(Math.random() * 10) + 1;
-    const num2 = Math.floor(Math.random() * 10) + 1;
+// Juego de Sumas
+function startAdditionGame() {
+    // Números pequeños y fáciles para niños
+    const num1 = Math.floor(Math.random() * 5) + 1; // 1-5
+    const num2 = Math.floor(Math.random() * 5) + 1; // 1-5
     const sum = num1 + num2;
 
-    updateMessage(`🔢 ¿Cuánto es ${num1} + ${num2}?`);
+    // Crear representación visual con emojis
+    const emoji1 = '⭐'.repeat(num1);
+    const emoji2 = '⭐'.repeat(num2);
+
+    updateMessage(`➕ Suma:\n\n${emoji1} + ${emoji2}\n\n${num1} + ${num2} = ?`);
     speak(`¿Cuánto es ${num1} más ${num2}?`);
 
+    robotFace.setExpression('curious');
+
     setTimeout(() => {
-        updateMessage(`¡La respuesta es ${sum}! 🎉`);
-        speak(`¡La respuesta es ${sum}!`);
+        const emojiTotal = '⭐'.repeat(sum);
+        updateMessage(`¡Correcto! 🎉\n\n${emojiTotal}\n\n${num1} + ${num2} = ${sum}`);
+        speak(`¡Muy bien! ${num1} más ${num2} es ${sum}`);
         robotFace.setExpression('excited');
-    }, 6000);
+    }, 10000);
+}
+
+// Juego de Restas
+function startSubtractionGame() {
+    // Para restas, aseguramos que el resultado sea positivo
+    const num1 = Math.floor(Math.random() * 5) + 3; // 3-8
+    const num2 = Math.floor(Math.random() * (num1 - 1)) + 1; // 1 a (num1-1)
+    const diff = num1 - num2;
+
+    // Crear representación visual con emojis
+    const emoji1 = '🍎'.repeat(num1);
+    const emoji2 = '❌'.repeat(num2);
+
+    updateMessage(`➖ Resta:\n\n${emoji1}\n\nQuita ${num2}:\n${emoji2}\n\n${num1} - ${num2} = ?`);
+    speak(`Tienes ${num1} manzanas. Si quitas ${num2}, ¿cuántas quedan?`);
+
+    robotFace.setExpression('curious');
+
+    setTimeout(() => {
+        const emojiResult = '🍎'.repeat(diff);
+        updateMessage(`¡Excelente! 🎉\n\n${emojiResult}\n\n${num1} - ${num2} = ${diff}`);
+        speak(`¡Muy bien! ${num1} menos ${num2} es ${diff}`);
+        robotFace.setExpression('excited');
+    }, 10000);
 }
 
 function handleGameResponse(data) {
