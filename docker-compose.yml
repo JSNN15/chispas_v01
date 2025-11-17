@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Aplicación web principal
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chispas-webapp
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - WHISPER_SERVICE_URL=http://whisper:5001
+      - USE_LOCAL_WHISPER=true
+    volumes:
+      - ./webapp:/app
+    networks:
+      - chispas-network
+    restart: unless-stopped
+    depends_on:
+      - whisper
+
+  # Servicio de Whisper (reconocimiento de voz)
+  whisper:
+    build:
+      context: .
+      dockerfile: Dockerfile.whisper
+    container_name: chispas-whisper
+    ports:
+      - "5001:5001"
+    environment:
+      - WHISPER_MODEL=base  # Opciones: tiny, base, small, medium
+      - DEVICE=cpu          # Opciones: cpu, cuda
+      - MAX_AUDIO_SIZE=25   # MB
+    volumes:
+      - whisper-models:/root/.cache/huggingface
+    networks:
+      - chispas-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # Redis (opcional, para cache y sesiones)
+  redis:
+    image: redis:7-alpine
+    container_name: chispas-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - chispas-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+networks:
+  chispas-network:
+    driver: bridge
+
+volumes:
+  whisper-models:
+    driver: local
+  redis-data:
+    driver: local

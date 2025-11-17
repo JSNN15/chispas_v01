@@ -1,0 +1,16 @@
+# Dependencias para Whisper Local
+
+# Para análisis de hardware
+psutil==5.9.6
+
+# Opción 1: faster-whisper (CPU)
+faster-whisper==0.10.0
+
+# Opción 2: faster-whisper con GPU (solo si tienes NVIDIA)
+# faster-whisper[cuda]==0.10.0
+
+# Opción 3: Whisper API de OpenAI
+# openai==1.6.1
+
+# Nota: whisper.cpp no requiere instalación Python
+# Se compila directamente desde el repositorio de GitHub
