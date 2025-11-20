@@ -1,14 +1,15 @@
 /**
- * Chispas Robot - Aplicación principal
- * Maneja la interacción, voz, WebSocket y juegos
+ * Chispas Robot - Aplicación principal con IA
+ * Maneja la interacción, voz con Groq Whisper, WebSocket y juegos con IA
  */
 
 // Variables globales
 let socket;
 let robotFace;
-let recognition;
+let mediaRecorder;
+let audioChunks = [];
 let synthesis = window.speechSynthesis;
-let isListening = false;
+let isRecording = false;
 
 // Elementos del DOM
 const voiceBtn = document.getElementById('voiceBtn');
@@ -21,7 +22,7 @@ const statusText = document.getElementById('statusText');
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🤖 Inicializando Chispas...');
+    console.log('🤖 Inicializando Chispas con IA...');
 
     // Inicializar cara del robot
     robotFace = new RobotFace('robotFace');
@@ -29,14 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializar WebSocket
     initWebSocket();
 
-    // Inicializar reconocimiento de voz
-    initSpeechRecognition();
+    // Inicializar grabadora de audio
+    initAudioRecorder();
 
     // Inicializar event listeners
     initEventListeners();
-
-    // Mensaje de bienvenida
-    speak('¡Hola! Soy Chispas, tu amigo robot. ¿Cómo estás hoy?');
 });
 
 // ========== WEBSOCKET ==========
@@ -44,9 +42,9 @@ function initWebSocket() {
     socket = io();
 
     socket.on('connect', () => {
-        console.log('✅ Conectado al servidor');
-        statusText.textContent = 'Conectado';
-        updateMessage('¡Conectado! Estoy listo para jugar 😊');
+        console.log('✅ Conectado al servidor con IA');
+        statusText.textContent = 'Conectado ✨';
+        updateMessage('¡Hola! Estoy lista para aprender contigo 😊');
     });
 
     socket.on('disconnect', () => {
@@ -63,7 +61,7 @@ function initWebSocket() {
     });
 
     socket.on('robot_speak', (data) => {
-        console.log('Robot habla:', data);
+        console.log('🤖 Chispas:', data.message);
         updateMessage(data.message);
         if (data.expression) {
             robotFace.setExpression(data.expression);
@@ -71,94 +69,78 @@ function initWebSocket() {
         speak(data.message);
     });
 
-    socket.on('game_response', (data) => {
-        console.log('Respuesta de juego:', data);
-        handleGameResponse(data);
+    socket.on('transcription', (data) => {
+        console.log('📝 Transcripción:', data.text);
+        textInput.value = data.text;
     });
 }
 
-// ========== RECONOCIMIENTO DE VOZ ==========
-function initSpeechRecognition() {
-    // Verificar soporte de navegador
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-        console.warn('⚠️ Reconocimiento de voz no soportado');
-        voiceStatus.textContent = 'Reconocimiento de voz no disponible en este navegador';
-        voiceBtn.disabled = true;
-        return;
-    }
-
-    recognition = new SpeechRecognition();
-    recognition.lang = 'es-ES';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => {
-        console.log('🎤 Escuchando...');
-        isListening = true;
-        voiceBtn.classList.add('listening');
-        voiceBtnText.textContent = 'Escuchando...';
-        voiceStatus.textContent = '🎤 Te estoy escuchando...';
-        robotFace.setExpression('curious');
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        console.log('Reconocido:', transcript);
-        textInput.value = transcript;
-        sendMessage(transcript);
-    };
-
-    recognition.onerror = (event) => {
-        console.error('Error de reconocimiento:', event.error);
-        let errorMsg = 'Error al escuchar';
-
-        switch (event.error) {
-            case 'no-speech':
-                errorMsg = 'No escuché nada, intenta de nuevo';
-                break;
-            case 'audio-capture':
-                errorMsg = 'No se puede acceder al micrófono';
-                break;
-            case 'not-allowed':
-                errorMsg = 'Permiso de micrófono denegado';
-                break;
-            default:
-                errorMsg = `Error: ${event.error}`;
-        }
-
-        voiceStatus.textContent = errorMsg;
-        stopListening();
-    };
-
-    recognition.onend = () => {
-        console.log('🎤 Dejé de escuchar');
-        stopListening();
-    };
-}
-
-function startListening() {
-    if (!recognition) {
-        alert('Reconocimiento de voz no disponible');
-        return;
-    }
-
+// ========== GRABACIÓN DE AUDIO (para Groq Whisper) ==========
+async function initAudioRecorder() {
     try {
-        recognition.start();
-    } catch (e) {
-        console.error('Error al iniciar reconocimiento:', e);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            audioChunks = [];
+
+            // Convertir a base64 para enviar por WebSocket
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = () => {
+                const base64Audio = reader.result;
+                console.log('🎤 Enviando audio al servidor...');
+                socket.emit('audio_message', { audio: base64Audio });
+            };
+        };
+
+        console.log('✅ Grabadora de audio lista');
+        voiceStatus.textContent = 'Toca el micrófono para hablar';
+    } catch (error) {
+        console.error('❌ Error al inicializar micrófono:', error);
+        voiceStatus.textContent = 'No se pudo acceder al micrófono';
+        voiceBtn.disabled = true;
     }
 }
 
-function stopListening() {
-    isListening = false;
+function startRecording() {
+    if (!mediaRecorder) {
+        alert('Micrófono no disponible');
+        return;
+    }
+
+    audioChunks = [];
+    mediaRecorder.start();
+    isRecording = true;
+
+    voiceBtn.classList.add('listening');
+    voiceBtnText.textContent = 'Grabando...';
+    voiceStatus.textContent = '🎤 Escuchando...';
+    robotFace.setExpression('curious');
+
+    console.log('🎤 Grabando audio...');
+}
+
+function stopRecording() {
+    if (!mediaRecorder || !isRecording) return;
+
+    mediaRecorder.stop();
+    isRecording = false;
+
     voiceBtn.classList.remove('listening');
     voiceBtnText.textContent = 'Hablar';
-    voiceStatus.textContent = 'Toca el micrófono para hablar';
+    voiceStatus.textContent = 'Procesando...';
+    robotFace.setExpression('thinking');
+
+    console.log('⏹️ Deteniendo grabación...');
 }
 
-// ========== SÍNTESIS DE VOZ ==========
+// ========== SÍNTESIS DE VOZ MEJORADA ==========
 function speak(text) {
     // Cancelar cualquier voz anterior
     synthesis.cancel();
@@ -206,6 +188,7 @@ function speak(text) {
 
     utterance.onend = () => {
         console.log('✅ Terminé de hablar');
+        voiceStatus.textContent = 'Toca el micrófono para hablar';
     };
 
     utterance.onerror = (event) => {
@@ -226,8 +209,8 @@ function sendMessage(message) {
     textInput.value = '';
 
     // Actualizar UI
-    updateMessage('Déjame pensar...');
-    robotFace.setExpression('curious');
+    updateMessage('Déjame pensar... 🤔');
+    robotFace.setExpression('thinking');
 }
 
 function updateMessage(text) {
@@ -243,12 +226,30 @@ function updateMessage(text) {
 
 // ========== EVENT LISTENERS ==========
 function initEventListeners() {
-    // Botón de voz
-    voiceBtn.addEventListener('click', () => {
-        if (isListening) {
-            recognition.stop();
-        } else {
-            startListening();
+    // Botón de voz (presionar y mantener)
+    voiceBtn.addEventListener('mousedown', () => {
+        if (!isRecording) {
+            startRecording();
+        }
+    });
+
+    voiceBtn.addEventListener('mouseup', () => {
+        if (isRecording) {
+            stopRecording();
+        }
+    });
+
+    voiceBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!isRecording) {
+            startRecording();
+        }
+    });
+
+    voiceBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (isRecording) {
+            stopRecording();
         }
     });
 
@@ -281,127 +282,32 @@ function initEventListeners() {
                 sad: 'Me siento triste... 😢',
                 surprised: '¡Wow, qué sorpresa! 😲',
                 loving: '¡Te quiero mucho! 😍',
-                sleepy: 'Tengo sueño... 😴'
+                sleepy: 'Tengo sueño... 😴',
+                curious: '¿Qué será? 🤔'
             };
             updateMessage(messages[expression] || 'Nueva expresión');
         });
     });
 
-    // Botones de juegos
+    // Botones de juegos (ahora con IA)
     document.querySelectorAll('.btn-game').forEach(btn => {
         btn.addEventListener('click', () => {
             const game = btn.dataset.game;
-            console.log('Iniciando juego:', game);
-            startGame(game);
+            console.log('Iniciando juego con IA:', game);
+            startAIGame(game);
         });
     });
 }
 
-// ========== JUEGOS EDUCATIVOS ==========
-function startGame(gameType) {
+// ========== JUEGOS EDUCATIVOS CON IA ==========
+function startAIGame(gameType) {
     robotFace.setExpression('excited');
 
-    switch (gameType) {
-        case 'reading':
-            startReadingGame();
-            break;
-        case 'addition':
-            startAdditionGame();
-            break;
-        case 'subtraction':
-            startSubtractionGame();
-            break;
-        default:
-            updateMessage('¡Vamos a aprender!');
-    }
-}
+    // Enviar al servidor para que la IA genere el juego
+    socket.emit('start_game', { game: gameType });
 
-// Juego de Lectura
-function startReadingGame() {
-    const words = [
-        { word: 'CASA', syllables: 'ca-sa', meaning: '🏠' },
-        { word: 'GATO', syllables: 'ga-to', meaning: '🐱' },
-        { word: 'SOL', syllables: 'sol', meaning: '☀️' },
-        { word: 'LUNA', syllables: 'lu-na', meaning: '🌙' },
-        { word: 'FLOR', syllables: 'flor', meaning: '🌸' },
-        { word: 'AGUA', syllables: 'a-gua', meaning: '💧' },
-        { word: 'NIÑA', syllables: 'ni-ña', meaning: '👧' },
-        { word: 'PERRO', syllables: 'pe-rro', meaning: '🐕' },
-        { word: 'LIBRO', syllables: 'li-bro', meaning: '📖' },
-        { word: 'PELOTA', syllables: 'pe-lo-ta', meaning: '⚽' }
-    ];
-
-    const randomWord = words[Math.floor(Math.random() * words.length)];
-
-    updateMessage(`📖 Lee esta palabra:\n\n✨ ${randomWord.word} ✨\n\n(${randomWord.syllables})`);
-    speak(`Lee esta palabra. ${randomWord.word}. ${randomWord.syllables}`);
-
-    robotFace.setExpression('curious');
-
-    setTimeout(() => {
-        updateMessage(`¡Muy bien! ${randomWord.word} es ${randomWord.meaning}`);
-        speak(`¡Muy bien! ${randomWord.word}`);
-        robotFace.setExpression('happy');
-    }, 8000);
-}
-
-// Juego de Sumas
-function startAdditionGame() {
-    // Números pequeños y fáciles para niños
-    const num1 = Math.floor(Math.random() * 5) + 1; // 1-5
-    const num2 = Math.floor(Math.random() * 5) + 1; // 1-5
-    const sum = num1 + num2;
-
-    // Crear representación visual con emojis
-    const emoji1 = '⭐'.repeat(num1);
-    const emoji2 = '⭐'.repeat(num2);
-
-    updateMessage(`➕ Suma:\n\n${emoji1} + ${emoji2}\n\n${num1} + ${num2} = ?`);
-    speak(`¿Cuánto es ${num1} más ${num2}?`);
-
-    robotFace.setExpression('curious');
-
-    setTimeout(() => {
-        const emojiTotal = '⭐'.repeat(sum);
-        updateMessage(`¡Correcto! 🎉\n\n${emojiTotal}\n\n${num1} + ${num2} = ${sum}`);
-        speak(`¡Muy bien! ${num1} más ${num2} es ${sum}`);
-        robotFace.setExpression('excited');
-    }, 10000);
-}
-
-// Juego de Restas
-function startSubtractionGame() {
-    // Para restas, aseguramos que el resultado sea positivo
-    const num1 = Math.floor(Math.random() * 5) + 3; // 3-8
-    const num2 = Math.floor(Math.random() * (num1 - 1)) + 1; // 1 a (num1-1)
-    const diff = num1 - num2;
-
-    // Crear representación visual con emojis
-    const emoji1 = '🍎'.repeat(num1);
-    const emoji2 = '❌'.repeat(num2);
-
-    updateMessage(`➖ Resta:\n\n${emoji1}\n\nQuita ${num2}:\n${emoji2}\n\n${num1} - ${num2} = ?`);
-    speak(`Tienes ${num1} manzanas. Si quitas ${num2}, ¿cuántas quedan?`);
-
-    robotFace.setExpression('curious');
-
-    setTimeout(() => {
-        const emojiResult = '🍎'.repeat(diff);
-        updateMessage(`¡Excelente! 🎉\n\n${emojiResult}\n\n${num1} - ${num2} = ${diff}`);
-        speak(`¡Muy bien! ${num1} menos ${num2} es ${diff}`);
-        robotFace.setExpression('excited');
-    }, 10000);
-}
-
-function handleGameResponse(data) {
-    updateMessage(data.message);
-    speak(data.message);
-
-    if (data.type === 'color_guess') {
-        robotFace.setExpression('curious');
-    } else if (data.type === 'animal_sound') {
-        robotFace.setExpression('playful');
-    }
+    // Mostrar mensaje de carga
+    updateMessage('Preparando un juego divertido... 🎮');
 }
 
 // ========== UTILIDADES ==========
@@ -409,15 +315,15 @@ function handleGameResponse(data) {
 // Cargar voces cuando estén disponibles
 if (synthesis) {
     synthesis.onvoiceschanged = () => {
-        console.log('Voces disponibles:', synthesis.getVoices().length);
+        console.log('✅ Voces disponibles:', synthesis.getVoices().length);
     };
 }
 
 // Mantener la conexión activa
 setInterval(() => {
-    if (socket.connected) {
-        console.log('💓 Conexión activa');
+    if (socket && socket.connected) {
+        console.log('💓 Conexión IA activa');
     }
 }, 30000);
 
-console.log('✅ Aplicación Chispas iniciada correctamente');
+console.log('✅ Chispas con IA iniciada correctamente');
